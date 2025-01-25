@@ -8,100 +8,96 @@ from rest_framework import status
 from django.db.models import Q
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_category(request):
-    try:
-        serializer = CategorySerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message":"Successfully Created Category"},serializer.data, status=status.HTTP_201_CREATED)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def get_categories(request,id):
-    try:
-        categories = Category.objects.get(id=id)
-        serializer = CategorySerializer(categories)
-        return Response({"message":"Categories Created successfully"})
-    except Category:
-        return Response({"error": "Categories Not Found,Server error"},serializer.data,status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_product(request):
-    try:
-        serializer = ProductSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-    except Exception as e:
-        return Response({"error": "Product Not Created"}, status=status.HTTP_404_NOT_FOUND)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_products(request):
-    try:
-        products = Product.objects.filter(is_available=True)
-        serializer = ProductSerializer(products, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    except Product.DoesNotExist :
-        return Response({"error":"Producted Not Found"},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
-@api_view(['GET'])
-def list_products(request):
-    search = request.query_params.get('search', None)
-    category_id = request.query_params.get('category', None)
-    price_lte = request.query_params.get('price__lte', None)
-    
+def product_catalog(request):
     products = Product.objects.all()
 
-    if search:
-        products = products.filter(Q(name_icontains=search) | Q(description_icontains=search))
-    
+    # Filter by category
+    category_id = request.GET.get('category')
     if category_id:
         products = products.filter(category_id=category_id)
 
-    if price_lte:
-        products = products.filter(price__lte=price_lte)
-    
+    # Search by product name
+    search_query = request.GET.get('search')
+    if search_query:
+        products = products.filter(name__icontains=search_query)
+
     serializer = ProductSerializer(products, many=True)
     return Response(serializer.data)
-    
 
-api_view(["POST"])
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def category_list(request):
+    categories = Category.objects.all()
+    serializer = CategorySerializer(categories, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def view_cart(request):
+    cart_items = Cart.objects.filter(user=request.user)
+    serializer = CartSerializer(cart_items, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_to_cart(request):
+    product_id = request.data.get('product_id')
+    quantity = request.data.get('quantity', 1)
+
+    try:
+        product = Product.objects.get(id=product_id)
+        cart_item, created = Cart.objects.get_or_create(
+            user=request.user, 
+            product=product,
+            defaults={'quantity': quantity}
+        )
+        if not created:
+            cart_item.quantity += int(quantity)
+            cart_item.save()
+
+        serializer = CartSerializer(cart_item)
+        return Response(serializer.data)
+    except Product.DoesNotExist:
+        return Response({'error': 'Product not found'}, status=404)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_from_cart(request):
+    product_id = request.data.get('product_id')
+
+    Cart.objects.filter(user=request.user, product_id=product_id).delete()
+    return Response({'message': 'Item removed from cart'})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def view_orders(request):
+    orders = Order.objects.filter(user=request.user)
+    serializer = OrderSerializer(orders, many=True)
+    return Response(serializer.data)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_from_cart(request):
+    product_id = request.data.get('product_id')
+
+    Cart.objects.filter(user=request.user, product_id=product_id).delete()
+    return Response({'message': 'Item removed from cart'})
+
+
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def place_order(request):
-    try:
-        user = request.user
-        cart = Cart.objects.get(user=user)
+    cart_items = Cart.objects.filter(user=request.user)
+    if not cart_items:
+        return Response({'error': 'Cart is empty'}, status=400)
 
-        if not cart.products.exists():
-            raise Exception("Your cart is empty. Add products to your cart before placing an order.")
+    total_amount = sum(item.product.price * item.quantity for item in cart_items)
+    order = Order.objects.create(user=request.user, total_amount=total_amount)
 
-        payment_status = request.data.get("payment_status", "Pending")
-        order_data = {
-            "user": user.id,
-            "cart": cart.id,
-            "status": "Pending",
-            "payment_status": payment_status
-        }
+    # Clear the cart after placing the order
+    cart_items.delete()
 
-        serializer = OrderSerializer(data=order_data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        return Response({
-            "message": "Order placed successfully.",
-            "order": serializer.data
-        }, status=status.HTTP_201_CREATED)
-
-    except Cart.DoesNotExist:
-        return Response({"message": "Cart not found."}, status=status.HTTP_404_NOT_FOUND)
-    
+    serializer = OrderSerializer(order)
+    return Response(serializer.data)

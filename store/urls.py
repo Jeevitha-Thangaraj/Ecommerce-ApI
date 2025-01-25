@@ -1,15 +1,16 @@
 from django.urls import path
-from store.views import create_category,get_categories,create_product,get_products,list_products,place_order
+from store.views import product_catalog,category_list,view_cart,add_to_cart,remove_from_cart,view_orders,place_order
 
 
 urlpatterns=[
-    path('create-category/',create_category),
-    path('get-category<int:id>/',get_categories),
-    path('create-product<int:id>/',create_product),
-    path('get-product/',get_products),
-    path('list-product/',list_products),
-    path('place-oder/',place_order),
+    path('products/',product_catalog),
+    path('categories/', category_list),
+    path('cart/', view_cart),
+    path('cart/add/',add_to_cart),
+    path('cart/remove/',remove_from_cart),
+    path('orders/',view_orders),
+    path('orders/place/',place_order),
+]
     
 
 
-]
