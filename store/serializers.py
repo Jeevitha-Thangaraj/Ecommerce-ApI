@@ -13,8 +13,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
-        model=Category
-        field="__all__"
+        model = Category
+        fields = '__all__'  # This will include all fields from the model
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:

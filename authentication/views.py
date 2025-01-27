@@ -3,8 +3,8 @@ from rest_framework.decorators import api_view,permission_classes
 from authentication.serializers import UserSerializer
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login, logout
-from rest_framework_simplejwt.tokens import AccessToken
+from django.contrib.auth import authenticate
+from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status 
 from rest_framework.authtoken.models import Token
@@ -30,8 +30,11 @@ def login_user(request):
 
     if not user:
         return Response({"error": "Invalid credentials"}, status=401)
+    
+    # else:
+    #     return Response({"message":"login successfully","data":UserSerializer(user).data},status=status.HTTP_200_OK)
 
-    token = Token.objects.create(user=user)
+    token ,created= Token.objects.get_or_create(user=user)
 
     return Response({"message": "Login successful", "key": token.key})
         

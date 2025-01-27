@@ -26,12 +26,45 @@ def product_catalog(request):
     serializer = ProductSerializer(products, many=True)
     return Response(serializer.data)
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_category(request):
+    try:
+        # Extracting data from request
+        name = request.data.get("name", None)
+        description = request.data.get("description", None)
+        
+        # Validation for required fields
+        if not name or not description:
+            raise Exception("Please enter values for name and description.")
+        
+        # Creating category data
+        serializer = CategorySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        
+        # Successful response
+        return Response({"message": "Category created successfully", "data": serializer.data}, status=status.HTTP_201_CREATED)
+    except Exception as e:
+        # Handling errors
+        return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def category_list(request):
     categories = Category.objects.all()
     serializer = CategorySerializer(categories, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+def get_category(request,id):
+    try:
+        category = Category.objects.get(id=id)
+        serializer = CategorySerializer(category)
+        return Response({"message": "Categories fetched successfully", "data": serializer.data}, status=status.HTTP_200_OK)
+    except Category.DoesNotExist:
+        return Response({"message":"Id Doesn't Exits"},status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
